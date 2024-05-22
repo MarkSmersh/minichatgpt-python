@@ -1,15 +1,11 @@
 import asyncio
 
 from aiogram import Dispatcher, Bot, Router
-from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message
+from aiogram.types import Message, ReplyKeyboardRemove
 from aiogram.filters import CommandStart
-from aiogram.methods.send_message import SendMessage
-from aiogram.methods.get_me import GetMe
-from aiogram.methods.get_file import GetFile
 
 from openai import AsyncOpenAI
 
@@ -27,24 +23,38 @@ client = AsyncOpenAI(api_key=getenv('OPENAI_TOKEN'))
 
 
 class F(StatesGroup):
-    accept = State()
+    ready = State()
+    processing = State()
+
+
+@r.startup()
+async def startup():
+    print(f'Bot {(await bot.get_me()).first_name} has started')
 
 
 @r.message(CommandStart())
 async def start(m: Message, state: FSMContext):
+    if (await state.get_state()) == F.processing:
+        await m.answer("Wait until request processing will end")
+        return
+
     admin = getenv("ADMIN")
     users = getenv("USERS").split(",")
 
     if str(m.from_user.id) == admin or str(m.from_user.id) in users:
-        await m.answer(f"Welcome, {m.from_user.first_name}")
-        await state.set_state(F.accept)
+        await m.answer(f"Welcome, {m.from_user.first_name}", reply_markup=ReplyKeyboardRemove())
+        await state.set_state(F.ready)
     else:
         await m.answer(f"You are not supposed to be here, {m.from_user.first_name}")
-        await bot(SendMessage(chat_id=m.chat.id, text=f"Someone tried to use the bot ({m.chat.id})"))
+        await bot.send_message(chat_id=m.chat.id, text=f"Someone tried to use the bot ({m.chat.id})")
 
 
-@r.message(F.accept)
-async def accept(m: Message):
+@r.message(F.ready)
+async def accept(m: Message, state: FSMContext):
+    await state.set_state(F.processing)
+
+    message = await m.answer("Processing...", reply_to_message_id=m.message_id)
+
     messages = [
         {"role": "system", "content": "ANSWER AS SHORT AS POSSIBLE. YOUR NAME IS MiniChatGPT. MAX ANSWER LENGTH ARE 2048 SYMBOLS."},
     ]
@@ -52,18 +62,18 @@ async def accept(m: Message):
     print(m)
 
     if m.reply_to_message:
-        if m.reply_to_message.from_user.id == (await bot(GetMe())).id:
+        if m.reply_to_message.from_user.id == (await bot.get_me()).id:
             messages.append({"role": "assistant", "content": m.reply_to_message.text})
         else:
             if m.reply_to_message.photo:
-                messages.append({"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"https://api.telegram.org/file/bot{getenv('BOT_TOKEN')}/{(await bot(GetFile(file_id=m.reply_to_message.photo[-1].file_id))).file_path}","detail": "low"}}, {"type": "text", "text": m.reply_to_message.caption or ""}]})
+                messages.append({"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"https://api.telegram.org/file/bot{getenv('BOT_TOKEN')}/{(await bot.get_file(file_id=m.reply_to_message.photo[-1].file_id)).file_path}", "detail": "low"}}, {"type": "text", "text": m.reply_to_message.caption or ""}]})
             elif not m.text:
                 return
             else:
                 messages.append({"role": "user", "content": m.reply_to_message.text})
 
     if m.photo:
-        messages.append({"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"https://api.telegram.org/file/bot{getenv('BOT_TOKEN')}/{(await bot(GetFile(file_id=m.photo[-1].file_id))).file_path}", "detail": "low"}}, {"type": "text", "text": m.caption or ""}]})
+        messages.append({"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"https://api.telegram.org/file/bot{getenv('BOT_TOKEN')}/{(await bot.get_file(file_id=m.photo[-1].file_id)).file_path}", "detail": "low"}}, {"type": "text", "text": m.caption or ""}]})
     elif not m.text:
         return
     else:
@@ -84,9 +94,11 @@ async def accept(m: Message):
         print(e)
 
     try:
-        await m.answer(result.choices[0].message.content, reply_to_message_id=m.message_id, parse_mode=ParseMode.MARKDOWN)
-    except Exception as e:
-        await m.answer(result.choices[0].message.content, reply_to_message_id=m.message_id)
+        await message.edit_text(result.choices[0].message.content, parse_mode=ParseMode.MARKDOWN)
+    except Exception:
+        await message.edit_text(result.choices[0].message.content)
+
+    await state.set_state(F.ready)
 
 
 async def main():
