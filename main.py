@@ -8,9 +8,10 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message
 from aiogram.filters import CommandStart
 from aiogram.methods.send_message import SendMessage
+from aiogram.methods.get_me import GetMe
+from aiogram.methods.get_file import GetFile
 
 from openai import AsyncOpenAI
-from openai._exceptions import APIStatusError
 
 from dotenv import load_dotenv
 from os import getenv
@@ -18,7 +19,7 @@ from os import getenv
 
 load_dotenv()
 
-bot = Bot(token=getenv('BOT_TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.MARKDOWN))
+bot = Bot(token=getenv('BOT_TOKEN'))
 dp = Dispatcher()
 r = Router()
 
@@ -43,21 +44,44 @@ async def start(m: Message, state: FSMContext):
 
 
 @r.message(F.accept)
-async def accept(m: Message, state: FSMContext):
+async def accept(m: Message):
+    messages = [
+        {"role": "system", "content": "ANSWER AS SHORT AS POSSIBLE. YOUR NAME IS MiniChatGPT. MAX ANSWER LENGTH ARE 2048 SYMBOLS."},
+    ]
+
+    print(m)
+
+    if m.reply_to_message:
+        if m.reply_to_message.from_user.id == (await bot(GetMe())).id:
+            messages.append({"role": "assistant", "content": m.reply_to_message.text})
+        else:
+            messages.append({"role": "user", "content": m.reply_to_message.text})
+
+    if m.photo:
+        messages.append({"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"https://api.telegram.org/file/bot{getenv('BOT_TOKEN')}/{(await bot(GetFile(file_id=m.photo[-1].file_id))).file_path}", "detail": "low"}}, {"type": "text", "text": m.caption or ""}]})
+    elif not m.text:
+        return
+    else:
+        messages.append({"role": "user", "content": m.text})
+
+    print(messages)
+
+    result = None
+
     try:
-        result = await client.chat.completions.create(
+        res = await client.chat.completions.create(
             model="gpt-4o",
-            messages=[
-                {"role": "system",
-                 "content": "You are Satoru Gojo from Jujutsu Kaisen."},
-                {"role": "user", "content": m.text}
-            ]
+            messages=messages,
         )
 
-        await m.answer(result.choices[0].message.content, parse_mode=ParseMode.MARKDOWN, reply_to_message_id=m.message_id)
-    except APIStatusError as e:
-        if e.status_code == 429:
-            await m.answer(e.message)
+        result = res
+    except Exception as e:
+        print(e)
+
+    try:
+        await m.answer(result.choices[0].message.content, reply_to_message_id=m.message_id, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        await m.answer(result.choices[0].message.content, reply_to_message_id=m.message_id)
 
 
 async def main():
