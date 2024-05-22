@@ -55,7 +55,12 @@ async def accept(m: Message):
         if m.reply_to_message.from_user.id == (await bot(GetMe())).id:
             messages.append({"role": "assistant", "content": m.reply_to_message.text})
         else:
-            messages.append({"role": "user", "content": m.reply_to_message.text})
+            if m.reply_to_message.photo:
+                messages.append({"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"https://api.telegram.org/file/bot{getenv('BOT_TOKEN')}/{(await bot(GetFile(file_id=m.reply_to_message.photo[-1].file_id))).file_path}","detail": "low"}}, {"type": "text", "text": m.reply_to_message.caption or ""}]})
+            elif not m.text:
+                return
+            else:
+                messages.append({"role": "user", "content": m.reply_to_message.text})
 
     if m.photo:
         messages.append({"role": "user", "content": [{"type": "image_url", "image_url": {"url": f"https://api.telegram.org/file/bot{getenv('BOT_TOKEN')}/{(await bot(GetFile(file_id=m.photo[-1].file_id))).file_path}", "detail": "low"}}, {"type": "text", "text": m.caption or ""}]})
