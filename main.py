@@ -1,17 +1,20 @@
 import asyncio
+from asyncio import WindowsSelectorEventLoopPolicy
 
 from aiogram import Dispatcher, Bot, Router
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, ReplyKeyboardRemove
-from aiogram.filters import CommandStart
+from aiogram.filters import CommandStart, Command
 
 from openai import AsyncOpenAI
 
 from dotenv import load_dotenv
 from os import getenv
 
+from db import db
+from models import users, transactions, User, Transaction
 
 load_dotenv()
 
@@ -21,36 +24,76 @@ r = Router()
 
 client = AsyncOpenAI(api_key=getenv('OPENAI_TOKEN'))
 
+TEMPORARY_VALUE_price_per_million_tokens_for_one_dollar = 50000
 
 class F(StatesGroup):
-    ready = State()
-    processing = State()
+    start = State("start")
+    ready = State("ready")
+    processing = State("processing")
 
 
 @r.startup()
 async def startup():
+    admins: list[User] = await users.findmany(2)
+    if admins:
+        for admin in admins:
+            await bot.send_message(admin["chat_id"], f'Bot {(await bot.get_me()).first_name} has started')
+
     print(f'Bot {(await bot.get_me()).first_name} has started')
 
 
+@r.message(F.start)
 @r.message(CommandStart())
 async def start(m: Message, state: FSMContext):
+    if await state.get_state() != F.ready:
+        await state.set_state(F.start)
+
     if (await state.get_state()) == F.processing:
         await m.answer("Wait until request processing will end")
         return
 
-    admin = getenv("ADMIN")
-    users = getenv("USERS").split(",")
+    user = await users.findone(m.chat.id)
 
-    if str(m.from_user.id) == admin or str(m.from_user.id) in users:
+    if not user:
+        user: User = await users.create(m.chat.id, m.from_user.first_name, m.from_user.last_name, await state.get_state())
+
+    print(user)
+
+    if user['access'] != 0:
         await m.answer(f"Welcome, {m.from_user.first_name}", reply_markup=ReplyKeyboardRemove())
         await state.set_state(F.ready)
     else:
         await m.answer(f"You are not supposed to be here, {m.from_user.first_name}")
-        await bot.send_message(chat_id=m.chat.id, text=f"Someone tried to use the bot ({m.chat.id})")
+        admins: list[User] = await users.findmany(2)
+        if admins:
+            for admin in admins:
+                await bot.send_message(admin["chat_id"], f"Someone tried to use the bot ({m.chat.id})")
 
+@r.message(Command("usage"))
+async def usage(m: Message, state: FSMContext):
+    user = await users.findone(m.chat.id)
+
+    if not user:
+        user: User = await users.create(m.chat.id, m.from_user.first_name, m.from_user.last_name, await state.get_state())
+
+    user_transactions: list[Transaction] = await transactions.findmany(m.chat.id)
+    tokens: int = 0
+
+    for transaction in user_transactions:
+        print(transaction)
+        tokens += transaction['tokens']
+
+    await m.answer(f"Current balance: {user['balance']}\nEstimated remaining tokens: {user['balance']*TEMPORARY_VALUE_price_per_million_tokens_for_one_dollar}\nTokens used for the whole time: {tokens}")
 
 @r.message(F.ready)
 async def accept(m: Message, state: FSMContext):
+    user: User = await users.findone(m.chat.id)
+    if user['access'] == 0:
+        print(f"Your access is denied. Farewell, {m.from_user.first_name}")
+
+    if user['balance'] == 0:
+        print(f"Your balance is empty. Keep in touch with admin to solve this problem.")
+
     await state.set_state(F.processing)
 
     message = await m.answer("Processing...", reply_to_message_id=m.message_id)
@@ -89,6 +132,8 @@ async def accept(m: Message, state: FSMContext):
             messages=messages,
         )
 
+        await transactions.create(m.chat.id, res.usage.total_tokens, res.model)
+
         result = res
     except Exception as e:
         print(e)
@@ -103,8 +148,10 @@ async def accept(m: Message, state: FSMContext):
 
 async def main():
     dp.include_router(r)
+    await db.start()
     await dp.start_polling(bot)
 
 
 if __name__ == '__main__':
+    asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
