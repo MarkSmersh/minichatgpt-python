@@ -1,5 +1,5 @@
 import asyncio
-from asyncio import WindowsSelectorEventLoopPolicy
+# from asyncio import WindowsSelectorEventLoopPolicy
 
 from aiogram import Dispatcher, Bot, Router
 from aiogram.enums import ParseMode
@@ -153,5 +153,5 @@ async def main():
 
 
 if __name__ == '__main__':
-    asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
+    # asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
