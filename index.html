@@ -9,24 +9,31 @@
 <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
 <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 <body>
-<p id="text">Text should be here</p>
+<p id="text" class="">Text should be here <br> \[ f(x, y) = 1 - x^2 - y^2 \] <br> $f(x, y) = 1 - x^2 - y^2$</p>
 </body>
-<script>
-
-    function text() {
-        blocks = window.location.search.split("?").join("").split("&")
-
-        kv = {}
-
-        blocks.forEach((b, i) => {
-            keyToValText = blocks[i] // param=true
-            keyToVal = keyToValText.split("=")
-            kv[keyToVal[0]] = keyToVal[1]
-        })
-
-        document.getElementById("text").innerText = kv["text"]
+<style>
+    * {
+        background-color: #333333 !important;
+        color: white !important;
     }
 
-    text()
+    body {
+        margin: 5%;
+    }
+</style>
+<script>
+
+    function requestApply() {
+        regex = new RegExp("(text)=([A-Za-z0-9=+'\"]*)")
+        base64 = regex.exec(window.location.search)[2]
+        text = atob(base64)
+
+        console.log(base64)
+        console.log(text)
+
+        document.getElementById("text").innerText = text || document.getElementById("text").innerText
+    }
+
+    requestApply()
 </script>
 </html>

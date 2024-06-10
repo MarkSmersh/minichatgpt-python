@@ -2,6 +2,7 @@ import asyncio
 import sys
 if sys.platform == 'win32':
     from asyncio import WindowsSelectorEventLoopPolicy
+import base64
 
 from aiogram import Dispatcher, Bot, Router
 from aiogram.enums import ParseMode
@@ -140,11 +141,16 @@ async def accept(m: Message, state: FSMContext):
     except Exception as e:
         print(e)
 
+    encode_message = base64.b64encode(result.choices[0].message.content.encode())
+
     try:
+        print(f"https://marksmersh.github.io/?text={encode_message}")
+        print(encode_message)
+
         await message.edit_text(result.choices[0].message.content,
                                 parse_mode=ParseMode.MARKDOWN,
                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-                                    InlineKeyboardButton(text="Open via HTML", web_app=WebAppInfo(title="Open via HTML", url=""))
+                                    InlineKeyboardButton(text="Open via HTML", web_app=WebAppInfo(title="Open via HTML", url=f"https://marksmersh.github.io/?text={encode_message}"))
                                 ]]))
     except Exception:
         await message.edit_text(result.choices[0].message.content)
