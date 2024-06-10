@@ -144,13 +144,12 @@ async def accept(m: Message, state: FSMContext):
     encode_message = base64.b64encode(result.choices[0].message.content.encode())
 
     try:
-        print(f"https://marksmersh.github.io/?text={encode_message}")
-        print(encode_message)
+        print(f"https://marksmersh.github.io/?text={encode_message.decode('utf-8')}")
 
         await message.edit_text(result.choices[0].message.content,
                                 parse_mode=ParseMode.MARKDOWN,
                                 reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
-                                    InlineKeyboardButton(text="Open via HTML", web_app=WebAppInfo(title="Open via HTML", url=f"https://marksmersh.github.io/?text={encode_message}"))
+                                    InlineKeyboardButton(text="Open via HTML", web_app=WebAppInfo(title="Open via HTML", url=f"https://marksmersh.github.io/?text={encode_message.decode('utf-8')}"))
                                 ]]))
     except Exception:
         await message.edit_text(result.choices[0].message.content)
