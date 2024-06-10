@@ -37,7 +37,7 @@ class F(StatesGroup):
 @r.startup()
 async def startup():
     admins: list[User] = await users.findmany(2)
-    if admins:git
+    if admins:
         for admin in admins:
             await bot.send_message(admin["chat_id"], f'Bot {(await bot.get_me()).first_name} has started')
 
