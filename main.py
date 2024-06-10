@@ -1,11 +1,13 @@
 import asyncio
-# from asyncio import WindowsSelectorEventLoopPolicy
+import sys
+if sys.platform == 'win32':
+    from asyncio import WindowsSelectorEventLoopPolicy
 
 from aiogram import Dispatcher, Bot, Router
 from aiogram.enums import ParseMode
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from aiogram.types import Message, ReplyKeyboardRemove
+from aiogram.types import Message, ReplyKeyboardRemove, InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 from aiogram.filters import CommandStart, Command
 
 from openai import AsyncOpenAI
@@ -35,7 +37,7 @@ class F(StatesGroup):
 @r.startup()
 async def startup():
     admins: list[User] = await users.findmany(2)
-    if admins:
+    if admins:git
         for admin in admins:
             await bot.send_message(admin["chat_id"], f'Bot {(await bot.get_me()).first_name} has started')
 
@@ -99,7 +101,7 @@ async def accept(m: Message, state: FSMContext):
     message = await m.answer("Processing...", reply_to_message_id=m.message_id)
 
     messages = [
-        {"role": "system", "content": "ANSWER AS SHORT AS POSSIBLE. YOUR NAME IS MiniChatGPT. MAX ANSWER LENGTH ARE 2048 SYMBOLS."},
+        {"role": "system", "content": "ANSWER AS SHORT AS POSSIBLE. YOUR NAME IS MiniChatGPT. USE LATEX ONLY FOR MATH EXPRESSIONS. MAX ANSWER LENGTH ARE 4096 SYMBOLS."},
     ]
 
     print(m)
@@ -139,7 +141,11 @@ async def accept(m: Message, state: FSMContext):
         print(e)
 
     try:
-        await message.edit_text(result.choices[0].message.content, parse_mode=ParseMode.MARKDOWN)
+        await message.edit_text(result.choices[0].message.content,
+                                parse_mode=ParseMode.MARKDOWN,
+                                reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
+                                    InlineKeyboardButton(text="Open via HTML", web_app=WebAppInfo(title="Open via HTML", url=""))
+                                ]]))
     except Exception:
         await message.edit_text(result.choices[0].message.content)
 
@@ -153,5 +159,7 @@ async def main():
 
 
 if __name__ == '__main__':
-    # asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
+    print(sys.platform)
+    if sys.platform == 'win32':
+        asyncio.set_event_loop_policy(WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
