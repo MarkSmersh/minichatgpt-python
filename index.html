@@ -8,9 +8,9 @@
 </style>
 <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
 <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-<script id="MathJax-script-2" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js"></script>
+<script type="text/javascript" src="https://unpkg.com/commonmark@0.29.3/dist/commonmark.js"></script>
 <body>
-<p id="text" class="">Text should be here <br> \[ f(x, y) = 1 - x^2 - y^2 \] <br> $f(x, y) = 1 - x^2 - y^2$</p>
+    <div id="text" class="">Text should be here <br> \[ f(x, y) = 1 - x^2 - y^2 \] <br> $f(x, y) = 1 - x^2 - y^2$</div>
 </body>
 <style>
     * {
@@ -40,7 +40,14 @@
         console.log(base64)
         console.log(text)
 
-        document.getElementById("text").innerText = text || document.getElementById("text").innerText
+        var reader = new commonmark.Parser({smart: true});
+        var writer = new commonmark.HtmlRenderer({sourcepos: true});
+        var parsed = reader.parse(text); // parsed is a 'Node' tree
+        var result = writer.render(parsed); // result is a String
+
+        console.log(result)
+
+        document.getElementById("text").innerHTML = result || document.getElementById("text").innerHTML
     }
 
     requestApply()
