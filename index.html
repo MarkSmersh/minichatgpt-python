@@ -40,14 +40,12 @@
         console.log(base64)
         console.log(text)
 
-        var reader = new commonmark.Parser({smart: true});
-        var writer = new commonmark.HtmlRenderer({sourcepos: true});
-        var parsed = reader.parse(text); // parsed is a 'Node' tree
-        var result = writer.render(parsed); // result is a String
+        // var reader = new commonmark.Parser({smart: true});
+        // var writer = new commonmark.HtmlRenderer({sourcepos: true});
+        // var parsed = reader.parse(text); // parsed is a 'Node' tree
+        // var result = writer.render(parsed); // result is a String
 
-        console.log(result)
-
-        document.getElementById("text").innerHTML = result || document.getElementById("text").innerHTML
+        document.getElementById("text").innerHTML = text || document.getElementById("text").innerHTML
     }
 
     requestApply()
